@@ -1,6 +1,12 @@
-import tkinter as tk
-from tkinter import messagebox
+import sys
 import math
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QLabel, QComboBox,
+    QLineEdit, QPushButton, QVBoxLayout,
+    QFrame, QGraphicsDropShadowEffect
+)
+from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt
 
 # ============================================================
 # FRT Permeability Fluid Dynamic Viscosity Calculator
@@ -25,109 +31,285 @@ import math
 #   you have them — the math is already wired in.
 # ============================================================
 
+BLUE = {
+    "bg":        "#0d1b2a",   # deep navy background
+    "panel":     "#1b2d45",   # card / panel surface
+    "border":    "#1e3a5f",   # subtle border
+    "accent":    "#1a6fbd",   # primary blue accent
+    "accent_h":  "#2389e8",   # hover / highlight
+    "text":      "#e0eeff",   # primary text
+    "muted":     "#7099c2",   # secondary / label text
+    "result_bg": "#0f2340",   # result display background
+    "green":     "#3dd68c",   # success result value
+}
+
+STYLESHEET = f"""
+    QWidget {{
+        background-color: {BLUE['bg']};
+        color: {BLUE['text']};
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+    }}
+
+    QLabel#title {{
+        color: {BLUE['text']};
+        font-size: 15px;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }}
+
+    QLabel#subtitle {{
+        color: {BLUE['muted']};
+        font-size: 10px;
+    }}
+
+    QLabel#field_label {{
+        color: {BLUE['muted']};
+        font-size: 11px;
+    }}
+
+    QComboBox, QLineEdit {{
+        background-color: {BLUE['panel']};
+        border: 1px solid {BLUE['border']};
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: {BLUE['text']};
+        font-size: 12px;
+        selection-background-color: {BLUE['accent']};
+    }}
+
+    QComboBox:hover, QLineEdit:hover {{
+        border: 1px solid {BLUE['accent']};
+    }}
+
+    QComboBox:focus, QLineEdit:focus {{
+        border: 1px solid {BLUE['accent_h']};
+    }}
+
+    QComboBox QAbstractItemView {{
+        background-color: {BLUE['panel']};
+        border: 1px solid {BLUE['border']};
+        selection-background-color: {BLUE['accent']};
+        color: {BLUE['text']};
+        padding: 4px;
+    }}
+
+    QComboBox::drop-down {{
+        border: none;
+        padding-right: 8px;
+    }}
+
+    QPushButton {{
+        background-color: {BLUE['accent']};
+        color: {BLUE['text']};
+        border: none;
+        border-radius: 8px;
+        padding: 10px 0;
+        font-size: 13px;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+    }}
+
+    QPushButton:hover {{
+        background-color: {BLUE['accent_h']};
+    }}
+
+    QPushButton:pressed {{
+        background-color: {BLUE['accent']};
+    }}
+
+    QFrame#card {{
+        background-color: {BLUE['panel']};
+        border: 1px solid {BLUE['border']};
+        border-radius: 12px;
+    }}
+
+    QFrame#result_box {{
+        background-color: {BLUE['result_bg']};
+        border: 1px solid {BLUE['accent']};
+        border-radius: 10px;
+    }}
+
+    QLabel#result_value {{
+        color: {BLUE['green']};
+        font-size: 22px;
+        font-weight: bold;
+    }}
+
+    QLabel#result_detail {{
+        color: {BLUE['muted']};
+        font-size: 11px;
+    }}
+
+    QLabel#warning {{
+        color: #e8a838;
+        font-size: 10px;
+    }}
+"""
+
 
 def visc_rational(a, b, c, x_0, temp):
     # Rational function temperature model.
-    # x_0 is a pole-offset keeping the denominator nonzero
-    # across the valid temperature domain.
-    return round(a * ((temp - x_0) ** -2) + b * ((temp - x_0) ** -1) + c, 4)
+    return a * ((temp - x_0) ** -2) + b * ((temp - x_0) ** -1) + c
 
 
 def barus_correction(visc_T, alpha, pressure_psi):
     # Barus pressure correction: mu(T,P) = mu(T) * exp(alpha * P)
-    # alpha = 0 means no correction (pass-through).
     return visc_T * math.exp(alpha * pressure_psi)
 
 
 def viscP(fluid_type, temp, pressure_psi=0.0):
-    # Returns dynamic viscosity in cP at temperature (°F) and
-    # pressure (psi gauge). Pressure correction uses Barus equation.
+    # Returns dynamic viscosity in cP at temperature (°F) and pressure (psi).
 
     if fluid_type == "7% KCl":
-        # 7% potassium chloride brine — common non-damaging perm fluid
         a, b, c, x_0 = 14118.60487982875, 28.197267, 0.01992939, -68.2154
         alpha = 0.0  # TODO: replace with measured alpha for 7% KCl
         visc_T = visc_rational(a, b, c, x_0, temp)
 
     elif fluid_type == "Soltrol 130":
-        # Soltrol 130 isoparaffinic oil — hydrocarbon viscosity is more
-        # pressure-sensitive than brines; alpha matters more here.
-        # Density correction applied for temperature-dependent density.
         a, b, c, x_0 = -2330, 172, -0.0177, 0
         alpha = 0.0  # TODO: replace with measured alpha for Soltrol 130
         density_correction = 0.7815 - (temp * 0.0003961)
         visc_T = visc_rational(a, b, c, x_0, temp) * density_correction
 
     elif fluid_type == "Sea Water":
-        # Standard sea water (~3.5% NaCl equivalent salinity)
         a, b, c, x_0 = 14811.8, 29.2862, 0.01149865, -64.6513
         alpha = 0.0  # TODO: replace with measured alpha for sea water
         visc_T = visc_rational(a, b, c, x_0, temp)
 
     elif fluid_type == "13.0 lbm/gal CaBr2":
-        # Calcium bromide brine at 13.0 lb/gal — high-density perm fluid
         a, b, c, x_0 = 60000, 150, 0, -85
         alpha = 0.0  # TODO: replace with measured alpha for 13.0 lb/gal CaBr2
         visc_T = visc_rational(a, b, c, x_0, temp)
 
     elif fluid_type == "Fresh Water":
-        # Deionized / distilled fresh water
         a, b, c, x_0 = 16504.9, 10.8518, 0.032894, -68.2154
         alpha = 0.0  # TODO: replace with measured alpha for fresh water
         visc_T = visc_rational(a, b, c, x_0, temp)
 
     else:
-        # Unknown fluid — return 1.0 cP (water-like fallback), no correction
         return 1.0
 
     return round(barus_correction(visc_T, alpha, pressure_psi), 4)
 
 
-def calculate_viscosity():
-    fluid_type = fluid_type_var.get()
+class ViscCalcApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("FRT Fluid Viscosity Calculator")
+        self.setMinimumWidth(420)
+        self.setStyleSheet(STYLESHEET)
+        self._build_ui()
 
-    try:
-        temperature_fahrenheit = float(entry_temp.get())
-        pressure_psi = float(entry_pressure.get()) if entry_pressure.get().strip() else 0.0
+    def _build_ui(self):
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(20, 20, 20, 20)
+        root_layout.setSpacing(16)
 
-        viscosity = viscP(fluid_type, temperature_fahrenheit, pressure_psi)
-        result_label.config(
-            text=(
-                f"Viscosity of {fluid_type}\n"
-                f"at {temperature_fahrenheit}°F, {pressure_psi} psi  →  {viscosity} cP"
+        # --- Title ---
+        title = QLabel("FRT FLUID VISCOSITY")
+        title.setObjectName("title")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        subtitle = QLabel("Dynamic Viscosity Calculator  ·  cP")
+        subtitle.setObjectName("subtitle")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        root_layout.addWidget(title)
+        root_layout.addWidget(subtitle)
+
+        # --- Input card ---
+        card = QFrame()
+        card.setObjectName("card")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(12)
+
+        # Fluid selector
+        card_layout.addWidget(self._field_label("Fluid Type"))
+        self.combo_fluid = QComboBox()
+        self.combo_fluid.addItems([
+            "7% KCl", "Soltrol 130", "Sea Water",
+            "13.0 lbm/gal CaBr2", "Fresh Water"
+        ])
+        card_layout.addWidget(self.combo_fluid)
+
+        # Temperature
+        card_layout.addWidget(self._field_label("Temperature (°F)"))
+        self.entry_temp = QLineEdit()
+        self.entry_temp.setPlaceholderText("e.g.  72")
+        card_layout.addWidget(self.entry_temp)
+
+        # Pressure
+        card_layout.addWidget(self._field_label("Pressure (psi)"))
+        self.entry_pressure = QLineEdit()
+        self.entry_pressure.setPlaceholderText("e.g.  500  (0 = no correction)")
+        card_layout.addWidget(self.entry_pressure)
+
+        # Pressure warning
+        warn = QLabel("Pressure correction coefficients (alpha) are placeholders — see code TODOs.")
+        warn.setObjectName("warning")
+        warn.setWordWrap(True)
+        card_layout.addWidget(warn)
+
+        root_layout.addWidget(card)
+
+        # --- Calculate button ---
+        btn = QPushButton("Calculate Viscosity")
+        btn.clicked.connect(self._calculate)
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(18)
+        shadow.setColor(QColor(26, 111, 189, 160))
+        shadow.setOffset(0, 4)
+        btn.setGraphicsEffect(shadow)
+        root_layout.addWidget(btn)
+
+        # --- Result box ---
+        self.result_box = QFrame()
+        self.result_box.setObjectName("result_box")
+        result_layout = QVBoxLayout(self.result_box)
+        result_layout.setContentsMargins(16, 14, 16, 14)
+        result_layout.setSpacing(4)
+
+        self.result_value = QLabel("—")
+        self.result_value.setObjectName("result_value")
+        self.result_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.result_detail = QLabel("")
+        self.result_detail.setObjectName("result_detail")
+        self.result_detail.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        result_layout.addWidget(self.result_value)
+        result_layout.addWidget(self.result_detail)
+        root_layout.addWidget(self.result_box)
+
+    def _field_label(self, text):
+        lbl = QLabel(text)
+        lbl.setObjectName("field_label")
+        return lbl
+
+    def _calculate(self):
+        try:
+            fluid = self.combo_fluid.currentText()
+            temp  = float(self.entry_temp.text())
+            pres_text = self.entry_pressure.text().strip()
+            pres  = float(pres_text) if pres_text else 0.0
+
+            visc = viscP(fluid, temp, pres)
+
+            self.result_value.setText(f"{visc} cP")
+            self.result_detail.setText(
+                f"{fluid}   ·   {temp}°F   ·   {pres} psi"
             )
-        )
-    except Exception:
-        messagebox.showerror("Error", "Invalid input or calculation error.")
+        except ValueError:
+            self.result_value.setText("Invalid input")
+            self.result_detail.setText("Check temperature and pressure fields.")
+        except Exception as e:
+            self.result_value.setText("Error")
+            self.result_detail.setText(str(e))
 
 
-# --- GUI setup ---
-root = tk.Tk()
-root.title("FRT Fluid Viscosity Calculator")
-
-fluid_type_var = tk.StringVar(root)
-fluid_type_var.set("7% KCl")
-
-tk.Label(root, text="Select Fluid Type:").grid(row=0, column=0, sticky="w", padx=6, pady=4)
-tk.OptionMenu(
-    root, fluid_type_var,
-    "7% KCl", "Soltrol 130", "Sea Water", "13.0 lbm/gal CaBr2", "Fresh Water"
-).grid(row=0, column=1, sticky="ew", padx=6)
-
-tk.Label(root, text="Temperature (°F):").grid(row=1, column=0, sticky="w", padx=6, pady=4)
-entry_temp = tk.Entry(root)
-entry_temp.grid(row=1, column=1, sticky="ew", padx=6)
-
-tk.Label(root, text="Pressure (psi):").grid(row=2, column=0, sticky="w", padx=6, pady=4)
-entry_pressure = tk.Entry(root)
-entry_pressure.insert(0, "0")
-entry_pressure.grid(row=2, column=1, sticky="ew", padx=6)
-
-tk.Button(root, text="Calculate", command=calculate_viscosity).grid(
-    row=3, columnspan=2, pady=10
-)
-
-result_label = tk.Label(root, text="", justify="center")
-result_label.grid(row=4, columnspan=2, pady=4)
-
-root.mainloop()
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = ViscCalcApp()
+    window.show()
+    sys.exit(app.exec())
