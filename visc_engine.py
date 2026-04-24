@@ -51,13 +51,20 @@ _SEAWATER_SALINITY_G_KG = 35.0  # standard ocean salinity
 # Laliberté (2009) KCl coefficients — CAS 7447-40-7
 # Laliberté, M. (2009). J. Chem. Eng. Data, 54(6), 1725-1760.
 # DOI: 10.1021/je8008123  Valid: 5–150 °C, w_KCl up to 0.306
-_KCL_W   = 0.07   # 7% KCl mass fraction
+_MW_KCL      = 74.551  # g/mol
+_KCL_DEFAULT_MOLALITY = 1.012   # mol/kg ≈ 7 wt%
 _KCL_V1  =  6.48805967116487
 _KCL_V2  =  1.31753131265255
 _KCL_V3  = -0.777820552977139
 _KCL_V4  =  0.0927156022360008
 _KCL_V5  = -1.30020256174307
 _KCL_V6  =  2.08120731758225
+
+
+def _kcl_molality_to_wt(molality: float) -> float:
+    """Convert KCl molality (mol/kg H₂O) to mass fraction (kg KCl / kg solution)."""
+    g_kcl_per_kg_water = molality * _MW_KCL          # g KCl per 1000 g water
+    return g_kcl_per_kg_water / (1000.0 + g_kcl_per_kg_water)
 
 
 def _visc_fw_liquid_cP(T_K: float, P_MPa: float) -> float:
@@ -105,8 +112,8 @@ def _visc_seawater_sharqawy(T_C: float, P_MPa: float,
     return mu_sw_atm * (mu_fw_P / mu_fw_atm)
 
 
-def _visc_kcl_laliberte(T_C: float, P_MPa: float, w_kcl: float = _KCL_W) -> float:
-    """7% KCl dynamic viscosity in cP via Laliberté (2009) with IAPWS pressure ratio.
+def _visc_kcl_laliberte(T_C: float, P_MPa: float, w_kcl: float) -> float:
+    """KCl dynamic viscosity in cP via Laliberté (2009) with IAPWS pressure ratio.
 
     Laliberté mixing rule (logarithmic weight-fraction average):
         ln(mu_mix) = w_w * ln(mu_w) + w_s * ln(mu_s)
@@ -137,9 +144,28 @@ def _visc_kcl_laliberte(T_C: float, P_MPa: float, w_kcl: float = _KCL_W) -> floa
 
     return mu_atm * (mu_fw_P / mu_fw_atm)
 
+def visc_kcl(temp: float, pressure_psi: float = 0.0,
+             molality: float = _KCL_DEFAULT_MOLALITY) -> float:
+    """KCl viscosity in cP at any molality.
+
+    Args:
+        temp:         Temperature in °F.
+        pressure_psi: Gauge pressure in psi (default 0).
+        molality:     KCl concentration in mol/kg H₂O (default 1.012 ≈ 7 wt%).
+                      Valid up to ~4.1 mol/kg (30.6 wt%).
+
+    Returns:
+        Viscosity in centipoise, rounded to 4 decimal places.
+    """
+    w_kcl = _kcl_molality_to_wt(molality)
+    T_C   = _F_TO_C(temp)
+    P_MPa = max(pressure_psi * _PSI_TO_MPA, _ATM_MPA)
+    return round(_visc_kcl_laliberte(T_C, P_MPa, w_kcl), 4)
+
+
 # Fluid names available to external callers
 FLUIDS = [
-    "7% KCl",
+    "KCl",
     "Soltrol 130",
     "Sea Water",
     "13.0 lbm/gal CaBr2",
@@ -172,12 +198,13 @@ def viscP(fluid_type: str, temp: float, pressure_psi: float = 0.0) -> float:
         Viscosity in centipoise, rounded to 4 decimal places.
         Returns 1.0 cP for unrecognised fluid types.
     """
-    if fluid_type == "7% KCl":
-        # Laliberté (2009) T+concentration model with IAPWS pressure ratio.
+    if fluid_type == "KCl":
+        # Laliberté (2009) at default 7 wt% (1.012 mol/kg).
+        # For arbitrary concentration use visc_kcl(temp, pressure_psi, molality).
         # Ref: J. Chem. Eng. Data, 54(6), 1725-1760. DOI: 10.1021/je8008123
         T_C   = _F_TO_C(temp)
         P_MPa = max(pressure_psi * _PSI_TO_MPA, _ATM_MPA)
-        return round(_visc_kcl_laliberte(T_C, P_MPa), 4)
+        return round(_visc_kcl_laliberte(T_C, P_MPa, _kcl_molality_to_wt(_KCL_DEFAULT_MOLALITY)), 4)
 
     elif fluid_type == "Soltrol 130":
         # Soltrol 130 isoparaffinic oil.

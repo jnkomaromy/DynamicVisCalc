@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
-from visc_engine import viscP, FLUIDS
+from visc_engine import viscP, visc_kcl, FLUIDS
 
 BLUE = {
     "bg":        "#0d1b2a",
@@ -129,7 +129,17 @@ class ViscCalcApp(QWidget):
         card_layout.addWidget(self._field_label("Fluid Type"))
         self.combo_fluid = QComboBox()
         self.combo_fluid.addItems(FLUIDS)
+        self.combo_fluid.currentTextChanged.connect(self._on_fluid_changed)
         card_layout.addWidget(self.combo_fluid)
+
+        # KCl concentration field — visible only when KCl is selected
+        self.kcl_label = self._field_label("KCl Concentration (mol/kg H₂O)")
+        self.entry_molality = QLineEdit()
+        self.entry_molality.setPlaceholderText("e.g.  1.012  (default = 7 wt%)")
+        card_layout.addWidget(self.kcl_label)
+        card_layout.addWidget(self.entry_molality)
+        self.kcl_label.setVisible(False)
+        self.entry_molality.setVisible(False)
 
         card_layout.addWidget(self._field_label("Temperature (°F)"))
         self.entry_temp = QLineEdit()
@@ -179,14 +189,28 @@ class ViscCalcApp(QWidget):
         lbl.setObjectName("field_label")
         return lbl
 
+    def _on_fluid_changed(self, fluid_name):
+        is_kcl = fluid_name == "KCl"
+        self.kcl_label.setVisible(is_kcl)
+        self.entry_molality.setVisible(is_kcl)
+
     def _calculate(self):
         try:
             fluid = self.combo_fluid.currentText()
             temp  = float(self.entry_temp.text())
             pres  = float(self.entry_pressure.text()) if self.entry_pressure.text().strip() else 0.0
-            visc  = viscP(fluid, temp, pres)
+
+            if fluid == "KCl":
+                mol_text = self.entry_molality.text().strip()
+                molality = float(mol_text) if mol_text else 1.012
+                visc = visc_kcl(temp, pres, molality)
+                fluid_label = f"KCl  {molality} mol/kg"
+            else:
+                visc = viscP(fluid, temp, pres)
+                fluid_label = fluid
+
             self.result_value.setText(f"{visc} cP")
-            self.result_detail.setText(f"{fluid}   ·   {temp}°F   ·   {pres} psi")
+            self.result_detail.setText(f"{fluid_label}   ·   {temp}°F   ·   {pres} psi")
         except ValueError:
             self.result_value.setText("Invalid input")
             self.result_detail.setText("Check temperature and pressure fields.")
