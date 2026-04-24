@@ -96,6 +96,10 @@ def viscP(fluid_type: str, temp: float, pressure_psi: float = 0.0) -> float:
 
     elif fluid_type == "Fresh Water":
         # IAPWS 2008 full T+P formulation — replaces rational function + Barus.
+        # Standard: "Release on the IAPWS Formulation 2008 for the Viscosity of
+        # Ordinary Water Substance", iapws.org
+        # Implemented via the iapws package by jjgomera (GPL v3):
+        # https://github.com/jjgomera/iapws
         # Pressure floor at atmospheric so IAPWS97 always gets a valid liquid state.
         T_K   = _F_TO_K(temp)
         P_MPa = max(pressure_psi * _PSI_TO_MPA, _ATM_MPA)
