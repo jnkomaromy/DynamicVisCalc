@@ -225,10 +225,19 @@ def viscP(fluid_type: str, temp: float, pressure_psi: float = 0.0) -> float:
         return round(_visc_seawater_sharqawy(T_C, P_MPa), 4)
 
     elif fluid_type == "13.0 lbm/gal CaBr2":
-        # Calcium bromide brine at 13.0 lb/gal — high-density perm fluid
+        # 13.0 lbm/gal CaBr2 completion brine (~49 wt%, density ~1.558 g/mL).
+        # Temperature model: rational function fitted to measured data.
+        # Pressure model: IAPWS fresh water pressure ratio — same physically
+        # justified correction used for KCl and Sea Water.
+        # TODO: replace rational T-model with Isono (1984) J.Chem.Eng.Data
+        # 29(1):45-52 (DOI: 10.1021/je00035a016) once data is accessible.
         a, b, c, x_0 = 60000, 150, 0, -85
-        alpha = 0.0  # TODO: replace with measured alpha for 13.0 lb/gal CaBr2
-        visc_T = visc_rational(a, b, c, x_0, temp)
+        T_K   = _F_TO_K(temp)
+        P_MPa = max(pressure_psi * _PSI_TO_MPA, _ATM_MPA)
+        visc_T    = visc_rational(a, b, c, x_0, temp)
+        mu_fw_atm = _visc_fw_liquid_cP(T_K, _ATM_MPA)
+        mu_fw_P   = _visc_fw_liquid_cP(T_K, P_MPa)
+        return round(visc_T * (mu_fw_P / mu_fw_atm), 4)
 
     elif fluid_type == "Fresh Water":
         # IAPWS 2008 full T+P formulation — replaces rational function + Barus.
