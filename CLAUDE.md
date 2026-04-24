@@ -56,19 +56,23 @@ need no changes.
 | Fresh Water         | IAPWS 2008 (via iapws.IAPWS97)      | YES — native |
 | Sea Water           | Sharqawy et al. 2010 + IAPWS ratio  | YES          |
 | KCl                 | Laliberte 2009 + IAPWS ratio        | YES          |
-| 13.0 lbm/gal CaBr2  | Rational function + Barus (a=0)     | TODO         |
-| Soltrol 130         | Rational function + Barus (a=0)     | TODO         |
+| 13.0 lbm/gal CaBr2  | Rational function + IAPWS ratio     | YES (partial) |
+| Soltrol 130         | Rational function + Barus (a=0)     | DEFERRED      |
 
-**Next up: 13.0 lbm/gal CaBr2.**
-Strategy: check if Laliberte (2009) has CaBr2 coefficients in the dataset
-(search CalebBell/chemicals Laliberte2009.tsv for CaBr2 or CAS 7789-41-5).
-If not found, fall back to interpolation from NIST or SPE experimental data,
-or fit a Jones-Dole extended equation to published data points.
+**All fluids are complete for now.**
 
-After CaBr2: Soltrol 130. It is a proprietary Chevron Phillips isoparaffinic
-solvent (C11-C14 blend). No public NIST data. Options: Chevron Phillips TDS,
-or experimental lab measurement. Real pressure correction requires lab data —
-Barus alpha for light isoparaffins is in the ~1e-5 to 1e-4 psi^-1 range.
+CaBr2 status: IAPWS pressure ratio applied. T-model is a rational function
+fit to original data. Upgrade path when data becomes available:
+  - Isono (1984) J. Chem. Eng. Data 29(1):45-52, DOI: 10.1021/je00035a016
+  - Currently paywalled. Try ResearchGate or library ILL.
+
+Soltrol 130 status: INTENTIONALLY DEFERRED — proprietary Chevron Phillips
+C11-C14 isoparaffinic blend, no public formulation exists. Needs lab work:
+  1. Measure viscosity at 3+ temperatures across FRT test range
+  2. Refit rational function coefficients to new measurements
+  3. Measure viscosity at 2+ pressures to extract Barus alpha
+     (expected: ~1e-5 to 1e-4 psi^-1 for light isoparaffins)
+Do not attempt to improve Soltrol 130 without real lab data.
 
 ---
 

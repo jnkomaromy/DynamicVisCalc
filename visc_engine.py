@@ -207,12 +207,20 @@ def viscP(fluid_type: str, temp: float, pressure_psi: float = 0.0) -> float:
         return round(_visc_kcl_laliberte(T_C, P_MPa, _kcl_molality_to_wt(_KCL_DEFAULT_MOLALITY)), 4)
 
     elif fluid_type == "Soltrol 130":
-        # Soltrol 130 isoparaffinic oil.
-        # Hydrocarbon viscosity is more pressure-sensitive than brines;
-        # alpha matters more here once you have the coefficient.
-        # Density correction applied for temperature-dependent density.
+        # Soltrol 130 isoparaffinic oil (Chevron Phillips C11-C14 blend).
+        # No public T+P formulation exists — proprietary fluid.
+        #
+        # TODO — requires lab measurement:
+        #   1. Measure viscosity at 3+ temperatures across test range (°F)
+        #   2. Refit rational function coefficients a, b, c, x_0 to new data
+        #   3. Measure viscosity at 2+ pressures at one temperature to get
+        #      Barus alpha (psi^-1): fit ln(mu_P/mu_0) = alpha * P
+        #      Expected range: ~1e-5 to 1e-4 psi^-1 for light isoparaffins
+        #
+        # Current T-model: rational function from original curve fit (°F).
+        # Current P-model: Barus with alpha=0 (no correction applied).
         a, b, c, x_0 = -2330, 172, -0.0177, 0
-        alpha = 0.0  # TODO: replace with measured alpha for Soltrol 130
+        alpha = 0.0
         density_correction = 0.7815 - (temp * 0.0003961)
         visc_T = visc_rational(a, b, c, x_0, temp) * density_correction
 
