@@ -8,12 +8,16 @@ Returns viscosity in **centipoise (cP)** as a function of **temperature (°F)** 
 | Fluid | Model |
 |-------|-------|
 | Fresh Water | IAPWS 2008 — full T + P formulation |
-| Sea Water | Rational function + Barus correction (alpha TBD) |
+| Sea Water | Sharqawy et al. (2010) T + S model, IAPWS pressure ratio |
 | 7% KCl | Rational function + Barus correction (alpha TBD) |
 | 13.0 lbm/gal CaBr₂ | Rational function + Barus correction (alpha TBD) |
 | Soltrol 130 | Rational function + Barus correction (alpha TBD) |
 
-Fresh Water uses the published IAPWS 2008 viscosity standard, which correctly captures the anomalous pressure–viscosity behaviour of water (viscosity decreases with pressure below ~30 °C, increases above it). Other fluids currently use empirical rational function fits; pressure correction coefficients (alpha) are placeholder zeros awaiting measured or literature values.
+Fresh Water uses the IAPWS 2008 viscosity standard, which correctly captures the anomalous pressure–viscosity behaviour of water (viscosity decreases with pressure below ~30 °C, increases above it).
+
+Sea Water uses the Sharqawy, Lienhard & Zubair (2010) correlation for temperature and salinity (fixed at standard ocean salinity 35 g/kg), with the IAPWS fresh water pressure ratio applied for the pressure dimension.
+
+Remaining fluids use empirical rational function fits; pressure correction coefficients (alpha) are placeholder zeros awaiting measured or literature values.
 
 ## Files
 
@@ -45,6 +49,12 @@ The Fresh Water viscosity model implements the **IAPWS Formulation 2008 for the 
 - Wagner, W. & Kruse, A. — *Properties of Water and Steam* (Springer, 1998)
 - IAPWS, 2008 — *Release on the IAPWS Formulation 2008 for the Viscosity of Ordinary Water Substance*
 - IAPWS, 2012 — *Revised Release on the IAPWS Industrial Formulation 1997 for the Thermodynamic Properties of Water and Steam*
+
+### Sharqawy, Lienhard & Zubair (2010)
+
+The Sea Water model uses the viscosity correlation from:
+
+> Sharqawy, M.H., Lienhard, J.H. & Zubair, S.M. (2010). *Thermophysical properties of seawater: A review of existing correlations and data.* Desalination and Water Treatment, 16(1-3), 354–380. DOI: 10.5004/dwt.2010.1079
 
 ### iapws Python package
 
