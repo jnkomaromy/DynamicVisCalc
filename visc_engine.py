@@ -21,7 +21,14 @@
 #     16(1-3):354-380, 2010. DOI:10.5004/dwt.2010.1079
 #     Assumes standard ocean salinity (35 g/kg).
 #
-#   All other fluids — rational function fit to measured data
+#   7% KCl — Laliberté (2009) for T + concentration, IAPWS pressure ratio for P.
+#     Ref: Laliberté, M. (2009). J. Chem. Eng. Data, 54(6), 1725-1760.
+#     DOI: 10.1021/je8008123
+#     Mixing rule: ln(mu_mix) = w_w*ln(mu_w) + w_s*ln(mu_s)
+#     mu_s = exp((v1*(1-w_w)^v2 + v3) / (v4*t + 1)) / (v5*(1-w_w)^v6 + 1)
+#     Coefficients sourced from CalebBell/chemicals (MIT), originally from paper.
+#
+#   Remaining fluids — rational function fit to measured data
 #     visc(T) = a/(T-x0)^2 + b/(T-x0) + c
 #     Pressure correction: Barus equation  visc(T,P) = visc(T)*exp(alpha*P)
 #     alpha values are currently 0.0 placeholders — no pressure
@@ -40,6 +47,17 @@ _F_TO_K     = lambda f: (f - 32) * 5 / 9 + 273.15
 _F_TO_C     = lambda f: (f - 32) * 5 / 9
 
 _SEAWATER_SALINITY_G_KG = 35.0  # standard ocean salinity
+
+# Laliberté (2009) KCl coefficients — CAS 7447-40-7
+# Laliberté, M. (2009). J. Chem. Eng. Data, 54(6), 1725-1760.
+# DOI: 10.1021/je8008123  Valid: 5–150 °C, w_KCl up to 0.306
+_KCL_W   = 0.07   # 7% KCl mass fraction
+_KCL_V1  =  6.48805967116487
+_KCL_V2  =  1.31753131265255
+_KCL_V3  = -0.777820552977139
+_KCL_V4  =  0.0927156022360008
+_KCL_V5  = -1.30020256174307
+_KCL_V6  =  2.08120731758225
 
 
 def _visc_fw_liquid_cP(T_K: float, P_MPa: float) -> float:
@@ -86,6 +104,39 @@ def _visc_seawater_sharqawy(T_C: float, P_MPa: float,
 
     return mu_sw_atm * (mu_fw_P / mu_fw_atm)
 
+
+def _visc_kcl_laliberte(T_C: float, P_MPa: float, w_kcl: float = _KCL_W) -> float:
+    """7% KCl dynamic viscosity in cP via Laliberté (2009) with IAPWS pressure ratio.
+
+    Laliberté mixing rule (logarithmic weight-fraction average):
+        ln(mu_mix) = w_w * ln(mu_w) + w_s * ln(mu_s)
+
+    Solute viscosity contribution:
+        mu_s = exp((v1*(1-w_w)^v2 + v3) / (v4*t + 1)) / (v5*(1-w_w)^v6 + 1)  [cP]
+
+    mu_w is taken from IAPWS (consistent with rest of engine).
+    Pressure correction uses IAPWS fresh water pressure ratio — same pattern
+    as Sea Water, physically justified for aqueous solutions.
+    """
+    w_w = 1.0 - w_kcl
+    T_K = T_C + 273.15
+
+    # Solute viscosity contribution (cP, Laliberté eq.)
+    mu_s = (math.exp((_KCL_V1 * (1 - w_w)**_KCL_V2 + _KCL_V3) / (_KCL_V4 * T_C + 1.0))
+            / (_KCL_V5 * (1 - w_w)**_KCL_V6 + 1.0))
+
+    # Water viscosity via IAPWS at atmospheric (base for mixing and pressure ratio)
+    mu_fw_atm = _visc_fw_liquid_cP(T_K, _ATM_MPA)
+
+    # Laliberté logarithmic mixing at atmospheric pressure
+    mu_atm = math.exp(w_w * math.log(mu_fw_atm) + w_kcl * math.log(mu_s))
+
+    # IAPWS pressure ratio correction
+    P_eff    = max(P_MPa, _ATM_MPA)
+    mu_fw_P  = _visc_fw_liquid_cP(T_K, P_eff)
+
+    return mu_atm * (mu_fw_P / mu_fw_atm)
+
 # Fluid names available to external callers
 FLUIDS = [
     "7% KCl",
@@ -122,10 +173,11 @@ def viscP(fluid_type: str, temp: float, pressure_psi: float = 0.0) -> float:
         Returns 1.0 cP for unrecognised fluid types.
     """
     if fluid_type == "7% KCl":
-        # 7% potassium chloride brine — common non-damaging perm fluid
-        a, b, c, x_0 = 14118.60487982875, 28.197267, 0.01992939, -68.2154
-        alpha = 0.0  # TODO: replace with measured alpha for 7% KCl
-        visc_T = visc_rational(a, b, c, x_0, temp)
+        # Laliberté (2009) T+concentration model with IAPWS pressure ratio.
+        # Ref: J. Chem. Eng. Data, 54(6), 1725-1760. DOI: 10.1021/je8008123
+        T_C   = _F_TO_C(temp)
+        P_MPa = max(pressure_psi * _PSI_TO_MPA, _ATM_MPA)
+        return round(_visc_kcl_laliberte(T_C, P_MPa), 4)
 
     elif fluid_type == "Soltrol 130":
         # Soltrol 130 isoparaffinic oil.

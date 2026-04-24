@@ -9,7 +9,7 @@ Returns viscosity in **centipoise (cP)** as a function of **temperature (°F)** 
 |-------|-------|
 | Fresh Water | IAPWS 2008 — full T + P formulation |
 | Sea Water | Sharqawy et al. (2010) T + S model, IAPWS pressure ratio |
-| 7% KCl | Rational function + Barus correction (alpha TBD) |
+| 7% KCl | Laliberté (2009) T + concentration model, IAPWS pressure ratio |
 | 13.0 lbm/gal CaBr₂ | Rational function + Barus correction (alpha TBD) |
 | Soltrol 130 | Rational function + Barus correction (alpha TBD) |
 
@@ -49,6 +49,14 @@ The Fresh Water viscosity model implements the **IAPWS Formulation 2008 for the 
 - Wagner, W. & Kruse, A. — *Properties of Water and Steam* (Springer, 1998)
 - IAPWS, 2008 — *Release on the IAPWS Formulation 2008 for the Viscosity of Ordinary Water Substance*
 - IAPWS, 2012 — *Revised Release on the IAPWS Industrial Formulation 1997 for the Thermodynamic Properties of Water and Steam*
+
+### Laliberté (2009)
+
+The 7% KCl model uses the electrolyte viscosity correlation from:
+
+> Laliberté, M. (2009). *Model for Calculating the Viscosity of Aqueous Solutions.* J. Chem. Eng. Data, 54(6), 1725–1760. DOI: 10.1021/je8008123
+
+Coefficients transcribed from the open-source [CalebBell/chemicals](https://github.com/CalebBell/chemicals) library (MIT licensed), which itself sources them from the paper.
 
 ### Sharqawy, Lienhard & Zubair (2010)
 

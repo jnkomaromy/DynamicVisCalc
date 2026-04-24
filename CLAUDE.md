@@ -49,18 +49,15 @@ need no changes.
 |---------------------|------------------------------------|--------------|
 | Fresh Water          | IAPWS 2008 (via iapws.IAPWS97)     | ✅ Yes       |
 | Sea Water            | Sharqawy et al. 2010 + IAPWS ratio | ✅ Yes       |
-| 7% KCl               | Rational function + Barus (α=0)    | ⬜ TODO      |
+| 7% KCl               | Laliberté 2009 + IAPWS ratio       | ✅ Yes       |
 | 13.0 lbm/gal CaBr₂  | Rational function + Barus (α=0)    | ⬜ TODO      |
 | Soltrol 130          | Rational function + Barus (α=0)    | ⬜ TODO      |
 
-**Next up: 7% KCl.**
-Target model: Laliberté (2007) or Abdulagatov & Azizov (2005) for T+molality,
-plus IAPWS pressure ratio correction (same pattern as Sea Water).
-7% KCl ≈ 1.01 mol/kg (MW KCl = 74.551 g/mol; 7 g / 74.551 / 0.093 kg H₂O).
-
-After KCl: 13.0 lbm/gal CaBr₂ (sparse literature — may need interpolation from
-NIST or SPE data). Soltrol 130 is a proprietary isoparaffin; only experimental
-data or Chevron Phillips TDS can provide a real pressure correction.
+**Next up: 13.0 lbm/gal CaBr₂.**
+Literature is sparse. Options: Laliberté (2009) if CaBr₂ coefficients exist in
+the dataset, or interpolation from NIST/SPE experimental data.
+After CaBr₂: Soltrol 130 (proprietary isoparaffin — Chevron Phillips TDS or
+experimental fit only; real pressure correction requires lab measurement).
 
 ---
 
