@@ -8,22 +8,28 @@
 #   from visc_engine import viscP, FLUIDS
 #   cP = viscP("7% KCl", temp=72.0, pressure_psi=500.0)
 #
-# Temperature model: rational function fit to measured data
-#   visc(T) = a/(T-x0)^2 + b/(T-x0) + c
+# Viscosity models by fluid:
 #
-# Pressure correction: Barus equation applied on top of visc(T)
-#   visc(T,P) = visc(T) * exp(alpha * P)
-#   where alpha [1/psi] is the pressure-viscosity coefficient.
+#   Fresh Water — IAPWS 2008 (via iapws.IAPWS97)
+#     Full T + P formulation. Requires the `iapws` package.
+#     Converts °F → K and psi → MPa internally.
 #
-# NOTE ON alpha VALUES:
-#   Currently set to 0.0 per fluid — no pressure correction
-#   is applied until you replace them with measured or
-#   literature values. Typical order of magnitude:
-#     brines:       ~1e-6 to 1e-5 psi^-1  (small effect)
-#     hydrocarbons: ~1e-5 to 1e-4 psi^-1  (notable at high P)
+#   All other fluids — rational function fit to measured data
+#     visc(T) = a/(T-x0)^2 + b/(T-x0) + c
+#     Pressure correction: Barus equation  visc(T,P) = visc(T)*exp(alpha*P)
+#     alpha values are currently 0.0 placeholders — no pressure
+#     correction applied until measured/literature values supplied.
+#     Typical order of magnitude:
+#       brines:       ~1e-6 to 1e-5 psi^-1
+#       hydrocarbons: ~1e-5 to 1e-4 psi^-1
 # ============================================================
 
 import math
+from iapws import IAPWS97
+
+_ATM_MPA   = 0.101325       # atmospheric pressure in MPa (floor for IAPWS calls)
+_PSI_TO_MPA = 0.00689476    # unit conversion
+_F_TO_K = lambda f: (f - 32) * 5 / 9 + 273.15
 
 # Fluid names available to external callers
 FLUIDS = [
@@ -89,10 +95,14 @@ def viscP(fluid_type: str, temp: float, pressure_psi: float = 0.0) -> float:
         visc_T = visc_rational(a, b, c, x_0, temp)
 
     elif fluid_type == "Fresh Water":
-        # Deionised / distilled fresh water
-        a, b, c, x_0 = 16504.9, 10.8518, 0.032894, -68.2154
-        alpha = 0.0  # TODO: replace with measured alpha for fresh water
-        visc_T = visc_rational(a, b, c, x_0, temp)
+        # IAPWS 2008 full T+P formulation — replaces rational function + Barus.
+        # Pressure floor at atmospheric so IAPWS97 always gets a valid liquid state.
+        T_K   = _F_TO_K(temp)
+        P_MPa = max(pressure_psi * _PSI_TO_MPA, _ATM_MPA)
+        state = IAPWS97(T=T_K, P=P_MPa)
+        if state.mu is None:
+            raise ValueError(f"IAPWS97: conditions out of range (T={temp}°F, P={pressure_psi} psi)")
+        return round(state.mu * 1000, 4)  # Pa·s → cP
 
     else:
         return 1.0  # unknown fluid — water-like fallback
